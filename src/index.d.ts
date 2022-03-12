@@ -15,7 +15,7 @@ declare module 'minecraft-protocol' {
 		socket: Socket
 		uuid: string
 		username: string
-		session?: any
+		session?: SessionOption
 		profile?: any
 		latency: number
 		customPackets: any
@@ -31,24 +31,50 @@ declare module 'minecraft-protocol' {
 		registerChannel(name: string, typeDefinition: any, custom?: boolean): void
 		unregisterChannel(name: string): void
 		writeChannel(channel: any, params: any): void
-		on(event: 'packet', handler: (data: any, packetMeta: PacketMeta, buffer: Buffer, fullBuffer: Buffer) => void): this
-		on(event: 'raw', handler: (buffer: Buffer, packetMeta: PacketMeta) => void): this
-		on(event: 'connect', handler: () => unknown): this
-		on(event: 'end', handler: (reason: string) => void): this
-		on(event: 'session', handler: (session: any) => void): this
-		on(event: 'state', handler: (newState: States, oldState: States) => void): this
-		on(event: 'error', listener: (error: Error) => void): this
-		on(event: string, handler: (data: any, packetMeta: PacketMeta) => unknown): this
-		on(event: `raw.${string}`, handler: (buffer: Buffer, packetMeta: PacketMeta) => unknown): this
 		on(event: 'error', listener: (error: Error) => PromiseLike): this
 		on(event: 'packet', handler: (data: any, packetMeta: PacketMeta, buffer: Buffer, fullBuffer: Buffer) => PromiseLike): this
 		on(event: 'raw', handler: (buffer: Buffer, packetMeta: PacketMeta) => PromiseLike): this
-		on(event: 'session', handler: (session: any) => PromiseLike): this
+		on(event: 'session', handler: (session: SessionObject) => PromiseLike): this
 		on(event: 'state', handler: (newState: States, oldState: States) => PromiseLike): this
 		on(event: 'end', handler: (reason: string) => PromiseLike): this
 		on(event: 'connect', handler: () => PromiseLike): this
 		on(event: string, handler: (data: any, packetMeta: PacketMeta) => PromiseLike): this
 		on(event: `raw.${string}`, handler: (buffer: Buffer, packetMeta: PacketMeta) => PromiseLike): this
+		once(event: 'error', listener: (error: Error) => PromiseLike): this
+		once(event: 'packet', handler: (data: any, packetMeta: PacketMeta, buffer: Buffer, fullBuffer: Buffer) => PromiseLike): this
+		once(event: 'raw', handler: (buffer: Buffer, packetMeta: PacketMeta) => PromiseLike): this
+		once(event: 'sessionce', handler: (sessionce: any) => PromiseLike): this
+		once(event: 'state', handler: (newState: States, oldState: States) => PromiseLike): this
+		once(event: 'end', handler: (reasonce: string) => PromiseLike): this
+		once(event: 'concenect', handler: () => PromiseLike): this
+		once(event: string, handler: (data: any, packetMeta: PacketMeta) => PromiseLike): this
+		once(event: `raw.${string}`, handler: (buffer: Buffer, packetMeta: PacketMeta) => PromiseLike): this
+	}
+
+	export interface SessionOption {
+		accessToken: string,
+		/** My be needed for mojang auth. Is send by mojang on username + password auth */
+		clientToken?: string,
+		selectedProfile: SessionProfile
+	}
+
+	export interface SessionObject {
+		accessToken: string,
+		/** My be needed for mojang auth. Is send by mojang on username + password auth */
+		clientToken?: string,
+		selectedProfile: {
+			name: string
+			id: string
+		}
+		availableProfiles?: SessionProfile[]
+		availableProfile?: SessionProfile[]
+	}
+
+	interface SessionProfile {
+		/** Character in game name */
+		name: string
+		/** Character UUID in short form */
+		id: string
 	}
 
 	export interface ClientOptions {
@@ -60,6 +86,7 @@ declare module 'minecraft-protocol' {
 		clientToken?: string
 		accessToken?: string
 		authServer?: string
+		authTitle?: string
 		sessionServer?: string
 		keepAlive?: boolean
 		closeTimeout?: number 
@@ -72,9 +99,12 @@ declare module 'minecraft-protocol' {
 		stream?: Stream
 		connect?: (client: Client) => void
 		agent?: Agent
-		profilesFolder?: string
+		fakeHost?: string
+		profilesFolder?: string | false
 		onMsaCode?: (data: MicrosoftDeviceAuthorizationResponse) => void
 		id?: number
+		session?: SessionOption
+		validateChannelProtocol?: boolean
 	}
 
 	export class Server extends EventEmitter {
@@ -107,16 +137,18 @@ declare module 'minecraft-protocol' {
 		kickTimeout?: number
 		checkTimeoutInterval?: number
 		'online-mode'?: boolean
-		beforePing?: (response: any, client: Client, callback?: (result: any) => any) => any
+		beforePing?: (response: any, client: Client, callback?: (error: any, result: any) => any) => any
 		beforeLogin?: (client: Client) => void
 		motd?: string
 		maxPlayers?: number
 		keepAlive?: boolean
 		version?: string
+		favicon?: string
 		customPackets?: any
 		errorHandler?: (client: Client, error: Error) => void
 		hideErrors?: boolean
 		agent?: Agent
+		validateChannelProtocol: boolean
 	}
 
 	export interface SerializerOptions {
@@ -157,6 +189,8 @@ declare module 'minecraft-protocol' {
 		port?: number
 		protocolVersion?: string
 		version?: string
+		closeTimeout?: number
+		noPongTimeout?: number
 	}
 
 	export interface OldPingResult {
@@ -164,25 +198,28 @@ declare module 'minecraft-protocol' {
 		motd: string
 		playerCount: number
 		prefix: string
-		protocol: string
+		protocol: number
 		version: string
 	}
 
 	export interface NewPingResult {
-		description: string
+		description: {
+			text?: string
+			extra?: any[]
+		} | string
 		players: {
 			max: number
 			online: number
-			sample: {
+			sample?: {
 				id: string
 				name: string
 			}[]
 		}
 		version: {
 			name: string
-			protocol: string
+			protocol: number
 		}
-		favicon: string
+		favicon?: string
 		latency: number
 	}
 
@@ -196,5 +233,5 @@ declare module 'minecraft-protocol' {
 	export function createSerializer({ state, isServer, version, customPackets }: SerializerOptions): any
 	export function createDeserializer({ state, isServer, version, customPackets }: SerializerOptions): any
 
-	export function ping(options: PingOptions, callback: (error: Error, result: OldPingResult | NewPingResult) => void): void
+	export function ping(options: PingOptions, callback?: (error: Error, result: OldPingResult | NewPingResult) => void): Promise<OldPingResult | NewPingResult>
 }
